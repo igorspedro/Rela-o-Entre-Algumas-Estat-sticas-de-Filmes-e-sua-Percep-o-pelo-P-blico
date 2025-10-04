@@ -1,0 +1,186 @@
+---
+title: "Trabalho de R - Relação Entre Algumas Estatísticas de Filmes e sua Percepção pelo Público"
+subtitle: "Igor Schiavo Pedro"
+output: html_document
+date: "2025-10-03"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Introdução:
+
+Esta análise investiga como o ano de lançamento e a duração dos filmes
+influenciam suas avaliações no IMDb, utilizando técnicas de regressão
+linear para identificar relações significativas entre essas variáveis.
+
+## 1)Bibliotecas Usadas
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+## 2)Importação e verificação dos dados 
+Aqui, usei como fonte as bases de dados do IMDB para fins não comerciais.
+
+```{r}
+notas <- read.delim("C:/Users/Lenovo/Downloads/title.ratings.tsv/title.ratings.tsv", sep = "\t", 
+                    header = TRUE,
+                    quote = "", 
+                    fill = TRUE,
+                    na.strings = "\\N")
+
+# Verifique as primeiras linhas dos dados
+head(notas)
+
+str(notas)
+
+dados <- read.delim("C:/Users/Lenovo/Downloads/title.basics.tsv/title.basics.tsv", 
+                    sep = "\t", 
+                    header = TRUE,
+                    quote = "", 
+                    fill = TRUE,
+                    na.strings = "\\N")
+
+# Verifique as primeiras linhas dos dados
+head(dados)
+
+str(dados)
+unique(dados$titleType)
+```
+
+## 3)Transformações e limpeza
+
+```{r}
+#queremos apenas os filmes
+dados_filmes<-dados %>% filter(titleType== "movie", startYear>=1970)
+
+#Removamos colunas desnecessárias
+dados_filmes <- dados_filmes %>%
+  select(tconst, startYear, runtimeMinutes)
+notas <- notas%>%
+  select(tconst,averageRating)
+
+dados_completos <- dados_filmes %>%
+  inner_join(notas, by = "tconst")
+dados_completos <- dados_completos %>%
+  filter(!is.na(runtimeMinutes))
+# Remover outliers distorcivos
+limite_inferior <- quantile(dados_completos$runtimeMinutes, 0.01, na.rm = TRUE)
+limite_superior <- quantile(dados_completos$runtimeMinutes, 0.99, na.rm = TRUE)
+
+dados_filtrados <- dados_completos %>%
+  filter(runtimeMinutes >= limite_inferior & runtimeMinutes <= limite_superior)
+str(dados_filtrados)
+```
+
+## 4) Gráficos
+
+```{r}
+# Gráfico de dispersão com linha de tendência
+ggplot(dados_filtrados, aes(x = runtimeMinutes, y = averageRating)) +
+  geom_point(alpha = 0.3, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  labs(title = "Duração do Filme vs Nota",
+       x = "Duração (minutos)",
+       y = "Nota Média") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(dados_filtrados, aes(x = startYear, y = averageRating)) +
+  geom_point(alpha = 0.2, color = "darkgreen") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  labs(title = "Ano de Lançamento vs Nota",
+       x = "Ano de Lançamento",
+       y = "Nota Média") +
+  theme_minimal()
+```
+
+Esses gráficos nos dão uma ideia de como o público gosta de filmes
+baseado no tempo de duração e data de lançamento. Havendo uma relação
+fraca, mas perceptível, especialmente no segundo caso.
+
+## 5)Regressão
+
+```{r}
+modelo <- lm(averageRating ~ I(startYear-1970) + runtimeMinutes, data = dados_filtrados)
+
+# Ver resumo do modelo
+summary(modelo)
+```
+
+Ao rodarmos essa regressão, quantificamos a relação mostrada pelos
+gráficos anteriores entre a "qualidade" de um filme e algumas de suas
+características. Os resultados da regressão indicam que os usuários do
+IMDb tendem a dar notas mais altas a filmes mais recentes e de maior
+duração. Esse padrão pode estar associado a diferentes fatores. No caso
+dos filmes recentes, existe um viés de popularidade, já que os
+lançamentos recebem maior atenção da mídia e do público, gerando
+avaliações mais positivas em função do entusiasmo inicial. Além disso, o
+perfil dos avaliadores do IMDb é predominantemente jovem e mais
+conectado ao consumo contemporâneo de cinema, o que pode favorecer
+produções atuais. Soma-se a isso o fato de que a indústria
+cinematográfica tem avançado em tecnologia e qualidade técnica, o que
+contribui para elevar a percepção de qualidade nos títulos mais novos.
+Quanto à duração, filmes mais longos costumam estar associados a
+orçamentos maiores, elencos renomados e propostas narrativas mais
+ambiciosas. Existe também a percepção de que um filme extenso requer
+maior inteligência para compreensão ( em geral), o que pode influenciar
+positivamente as avaliações sem necessariamente contar com conteúdo de
+maior qualidade. Por fim, é importante destacar que esse resultado pode
+estar condicionado a viéses da base de dados: muitos filmes antigos e
+medianos caem no esquecimento e não chegam a ser avaliados, enquanto
+gêneros mais longos, como épicos e dramas, já tendem a ter recepção
+crítica mais favorável. Assim, os efeitos observados refletem tanto
+transformações na produção cinematográfica quanto preferências e
+limitações da comunidade de votantes do IMDb. Além disso, o R2 da
+regressão ainda foi bem baixo, o que indica que essas variáveis por si
+só não explicam bem o gosto da audiência cinéfila, requerindo a presença
+de outras variáveis para um grau de ajuste mais robusto.
+
+## Glossário:
+
+### runtimeMinutes:
+
+Duração do filme, em minutos;
+
+### startYear:
+
+Ano de lançamento do filme;
+
+### tconst:
+
+Identificador alfanumérico único do título;
+
+### averageRating:
+
+Nota do filme no IMDB;
+
+### titleType:
+
+Tipo de produção, seja curta, série, filme para tv etc.
+
+## Como Reproduzir:
+
+Primeiramente, garanta que tem instalados todas as bibliotecas
+necessárias. São estas tidiyverse (limpeza e manipulação de dados) e
+ggplot2 (visualização gráfica dos dados). Caso não tenha, use
+install.packages() para cada uma destas, seguido de library().
+
+## Referências:
+
+A análise foi conduzida utilizando dois conjuntos de dados principais do
+IMDb: title.basics.tsv (contendo informações básicas dos títulos) e
+title.ratings.tsv (com as avaliações dos usuários). Inicialmente,
+realizamos uma filtragem para incluir apenas filmes (excluindo séries,
+documentários e outras categorias) produzidos a partir de 1970,
+garantindo assim uma análise focada no cinema contemporâneo.
+
+Essas bases estão dentre as expostas no link a seguir:
+<https://datasets.imdbws.com/>
+
+## Divulgação de IA:
+
+Ao longo do projeto, foi empregado o auxílio da ferramenta DeepSeek para relembrar funções e otimizar o código, sem grande destaque a algum prompt específico.
